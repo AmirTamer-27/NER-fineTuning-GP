@@ -1,0 +1,48 @@
+# Training data (uploaded to Kaggle separately)
+finaira_bilingual_ner_v2/
+
+# Local Python environments and vendored packages
+.finaira-packages/
+.venv/
+venv/
+env/
+
+# Hugging Face / model caches and downloaded checkpoints
+.huggingface/
+huggingface_cache/
+hf_cache/
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+
+# Python-generated files
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# IDE and operating-system files
+.DS_Store
+.vscode/
+.idea/
+
+# Secrets and local environment configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Local experiment outputs and logs
+mlruns/
+mlartifacts/
+outputs/
+checkpoints/
+logs/
+*.log
+
+# Generated audit/decoder outputs (the scripts remain tracked)
+tokenizer_audit_results/
+decoder_check_results/
+
