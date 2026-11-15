@@ -91,8 +91,8 @@ The trainable head and any trainable encoder layers remain in training mode.
 
 ## Results and DagsHub upload
 
-Each epoch saves token-weighted training/validation loss, token accuracy,
-token-level F1, strict entity precision/recall/F1, relaxed-overlap entity
+Each epoch saves training loss and token accuracy from the training batches,
+plus validation loss, token accuracy, token-level F1, strict entity precision/recall/F1, relaxed-overlap entity
 precision/recall/F1, per-entity-type scores, boundary-error counts, masked
 ambiguous-entity counts, and supervised-token counts in `history.json`. The
 default best-checkpoint metric is `validation_entity_strict_f1`. The model and

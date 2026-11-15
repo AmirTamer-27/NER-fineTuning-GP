@@ -245,10 +245,6 @@ def train(config_path):
         collate_fn=collator,
         generator=torch.Generator().manual_seed(settings["seed"]),
     )
-    validation_loader = DataLoader(
-        examples["validation"], batch_size=settings["batch_size"],
-        shuffle=False, collate_fn=collator,
-    )
     device = resolve_device(settings.get("device", "auto"))
     model = build_model(config["model"], label2id).to(device)
     optimizer = make_optimizer(model, settings)
@@ -286,12 +282,6 @@ def train(config_path):
             settings.get("max_grad_norm", 1.0),
             progress_desc=f"Epoch {epoch}/{settings['epochs']} - train",
         )
-        train_evaluation = evaluate_model(
-            model, prepared_examples["train"], records["train"], reports["train"],
-            collator, {value: key for key, value in label2id.items()},
-            config.get("evaluation", {}).get("batch_size", settings["batch_size"]), device,
-            progress_desc=f"Epoch {epoch}/{settings['epochs']} - train eval",
-        )
         validation_evaluation = evaluate_model(
             model, prepared_examples["validation"], records["validation"], reports["validation"],
             collator, {value: key for key, value in label2id.items()},
@@ -300,13 +290,11 @@ def train(config_path):
         )
         row = {"epoch": epoch}
         row.update({f"train_{k}": v for k, v in train_metrics.items()})
-        row.update(flatten_evaluation("train_eval", train_evaluation))
         row.update(flatten_evaluation("validation", validation_evaluation))
         history.append(row)
         write_json(run_dir / "history.json", history)
         evaluation_row = {
             "epoch": epoch,
-            "train": train_evaluation,
             "validation": validation_evaluation,
         }
         evaluation_history.append(evaluation_row)
