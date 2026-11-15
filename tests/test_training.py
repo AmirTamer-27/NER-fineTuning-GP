@@ -15,7 +15,7 @@ from torch import nn
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 import train
-from evaluation import invalid_i_transitions, token_label_counts
+from evaluation import entity_metrics_by_language, invalid_i_transitions, token_label_counts
 from collections import Counter
 
 
@@ -58,6 +58,30 @@ class TrainingTests(unittest.TestCase):
             invalid_i_transitions([2, 1, 2, 2, 2, 4], [0, 1, 2, -100, 0, 0], labels),
             3,
         )
+
+    def test_language_entity_f1_uses_document_language_and_span_rules(self):
+        records = [
+            {"id": "arabic", "language": "ar", "spans": [{"start": 0, "end": 4, "label": "PERSON"}], "ignore_spans": []},
+            {"id": "english", "language": "en", "spans": [{"start": 0, "end": 5, "label": "PERSON"}], "ignore_spans": []},
+        ]
+        reports = [{"ambiguous_entities": []}, {"ambiguous_entities": []}]
+        predictions = {"arabic": {(0, 4, "PERSON")}, "english": {(0, 4, "PERSON")}}
+        result = entity_metrics_by_language(records, reports, predictions)
+        self.assertEqual(result["ar"]["strict"]["f1"], 1.0)
+        self.assertEqual(result["en"]["strict"]["f1"], 0.0)
+        self.assertEqual(result["en"]["relaxed_overlap"]["f1"], 1.0)
+        metrics = {"entity_by_language": result, "entity": {}, "token_label_counts": {}}
+        # Flattening includes other metrics, so verify the language metrics in its result.
+        metrics.update({"loss": 0.0, "token_accuracy": 0.0, "token_micro_f1": 0.0,
+                        "token_macro_f1": 0.0, "invalid_i_transitions": 0})
+        metrics["entity"] = {"strict": {"precision": 0, "recall": 0, "f1": 0},
+                             "relaxed_overlap": {"precision": 0, "recall": 0, "f1": 0},
+                             "gold_entities": 0, "predicted_entities": 0,
+                             "masked_ambiguous_entities": 0, "ignored_entities": 0,
+                             "boundary_errors_with_correct_type": 0, "per_label": {}}
+        flattened = train.flatten_evaluation("validation", metrics)
+        self.assertEqual(flattened["validation_ar_entity_strict_f1"], 1.0)
+        self.assertEqual(flattened["validation_en_entity_relaxed_f1"], 1.0)
 
     def test_validation_weighted_loss_and_no_weight_updates(self):
         before = [p.detach().clone() for p in self.model.parameters()]

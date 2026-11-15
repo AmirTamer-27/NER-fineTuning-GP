@@ -233,6 +233,23 @@ def entity_metrics(records, reports, predictions_by_document):
     }
 
 
+def entity_metrics_by_language(records, reports, predictions_by_document):
+    """Score spans in Arabic and English documents using the same entity rules."""
+    by_language = {}
+    for language in ("ar", "en"):
+        pairs = [
+            (record, report) for record, report in zip(records, reports)
+            if record.get("language") == language
+        ]
+        if pairs:
+            by_language[language] = entity_metrics(
+                [record for record, _ in pairs],
+                [report for _, report in pairs],
+                predictions_by_document,
+            )
+    return by_language
+
+
 @torch.no_grad()
 def evaluate_model(
     model, examples, records, reports, collator, id2label, batch_size, device,
@@ -273,6 +290,7 @@ def evaluate_model(
 
     token = token_metrics(confusion, id2label)
     entities = entity_metrics(records, reports, predictions_by_document)
+    entities_by_language = entity_metrics_by_language(records, reports, predictions_by_document)
     return {
         "loss": total_loss / total_tokens if total_tokens else 0.0,
         "token_accuracy": token["accuracy"],
@@ -283,4 +301,5 @@ def evaluate_model(
         "token_label_counts": token_label_counts(confusion, id2label),
         "invalid_i_transitions": invalid_i_count,
         "entity": entities,
+        "entity_by_language": entities_by_language,
     }

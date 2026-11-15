@@ -173,6 +173,11 @@ def flatten_evaluation(prefix, result):
         safe_label = label.lower().replace("-", "_")
         flattened[f"{prefix}_token_{safe_label}_gold"] = counts["gold"]
         flattened[f"{prefix}_token_{safe_label}_predicted"] = counts["predicted"]
+    for language, metrics in result["entity_by_language"].items():
+        flattened[f"{prefix}_{language}_entity_strict_f1"] = metrics["strict"]["f1"]
+        flattened[f"{prefix}_{language}_entity_relaxed_f1"] = metrics["relaxed_overlap"]["f1"]
+        flattened[f"{prefix}_{language}_evaluable_gold_entities"] = metrics["gold_entities"]
+        flattened[f"{prefix}_{language}_predicted_entities"] = metrics["predicted_entities"]
     return flattened
 
 
@@ -277,10 +282,19 @@ def train(config_path):
     selection_metric = config.get("evaluation", {}).get(
         "selection_metric", "validation_loss"
     )
+    early_stopping = config.get("evaluation", {})
+    patience = early_stopping.get("early_stopping_patience")
+    min_delta = early_stopping.get("early_stopping_min_delta", 0.0)
+    if patience is not None and (not isinstance(patience, int) or isinstance(patience, bool) or patience < 1):
+        raise ValueError("evaluation.early_stopping_patience must be a positive integer.")
+    if not isinstance(min_delta, (int, float)) or not math.isfinite(min_delta) or min_delta < 0:
+        raise ValueError("evaluation.early_stopping_min_delta must be a non-negative finite number.")
     maximize_selection = any(
         term in selection_metric for term in ("f1", "precision", "recall", "accuracy")
     )
     best_score = -math.inf if maximize_selection else math.inf
+    stopping_score = best_score
+    epochs_without_improvement = 0
     for epoch in range(1, settings["epochs"] + 1):
         train_metrics = run_epoch(
             model, train_loader, device, optimizer,
@@ -309,13 +323,19 @@ def train(config_path):
             raise ValueError(f"Unknown evaluation selection metric: {selection_metric}")
         score = row[selection_metric]
         is_better = score > best_score if maximize_selection else score < best_score
+        language_f1 = ", ".join(
+            f"{language}_strict_f1={metrics['strict']['f1']:.2%}, "
+            f"{language}_relaxed_f1={metrics['relaxed_overlap']['f1']:.2%}"
+            for language, metrics in validation_evaluation["entity_by_language"].items()
+        )
         print(
             f"Epoch {epoch}: "
             f"train_loss={train_metrics['loss']:.4f}, "
             f"train_accuracy={train_metrics['token_accuracy']:.2%}, "
             f"validation_loss={validation_evaluation['loss']:.4f}, "
             f"validation_accuracy={validation_evaluation['token_accuracy']:.2%}, "
-            f"validation_recall={validation_evaluation['entity']['strict']['recall']:.2%}"
+            f"validation_recall={validation_evaluation['entity']['strict']['recall']:.2%}, "
+            f"{language_f1}"
         )
         if is_better:
             best_score = score
@@ -323,6 +343,22 @@ def train(config_path):
             tokenizer.save_pretrained(run_dir / "best_model")
             write_json(run_dir / "best_metrics.json", row)
             write_json(run_dir / "best_evaluation.json", evaluation_row)
+        significant_improvement = (
+            score > stopping_score + min_delta if maximize_selection
+            else score < stopping_score - min_delta
+        )
+        if significant_improvement:
+            stopping_score = score
+            epochs_without_improvement = 0
+        else:
+            epochs_without_improvement += 1
+        if patience is not None and epochs_without_improvement >= patience:
+            print(
+                f"Early stopping after epoch {epoch}: {selection_metric} did not improve "
+                f"by more than {min_delta:g} for {patience} consecutive epochs. "
+                f"Best checkpoint: epoch {json.loads((run_dir / 'best_metrics.json').read_text())['epoch']}."
+            )
+            break
 
     upload_to_mlflow(run_dir)
     return run_dir
