@@ -1,8 +1,7 @@
 """Prepare unpadded BIO training examples from annotated document records."""
 
-import warnings
-
 from alignment_policy import classify_boundary_conflict
+from tqdm.auto import tqdm
 
 
 def prepare_ner_dataset(
@@ -12,6 +11,7 @@ def prepare_ner_dataset(
     max_length=512,
     stride=64,
     include_metadata=False,
+    progress_desc="Tokenizing",
 ):
     """Return (examples, label2id, coverage_report).
 
@@ -42,7 +42,7 @@ def prepare_ner_dataset(
     def overlaps(start, end, span):
         return start < span["end"] and span["start"] < end
 
-    for document in dataset:
+    for document in tqdm(dataset, desc=progress_desc, unit="doc"):
         document_id = document["id"]
         text = document["text"]
         ignored = document.get("ignore_spans", [])
@@ -231,11 +231,4 @@ def prepare_ner_dataset(
             "ambiguous_boundary_conflicts": list(ambiguous_conflicts.values()),
             "unsupervised_entities": [spans[i].copy() for i in sorted(missing)],
         })
-        if missing:
-            warnings.warn(
-                f"{document_id}: {len(missing)} annotated entities received no "
-                "supervision; inspect coverage_report and chunk boundaries.",
-                stacklevel=2,
-            )
-
     return prepared, label2id, coverage_report

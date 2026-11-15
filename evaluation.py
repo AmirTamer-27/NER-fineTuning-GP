@@ -6,6 +6,7 @@ from collections import Counter, defaultdict
 
 import torch
 from torch.utils.data import DataLoader
+from tqdm.auto import tqdm
 
 from span_postprocessing import trim_decoded_span
 
@@ -207,7 +208,10 @@ def entity_metrics(records, reports, predictions_by_document):
 
 
 @torch.no_grad()
-def evaluate_model(model, examples, records, reports, collator, id2label, batch_size, device):
+def evaluate_model(
+    model, examples, records, reports, collator, id2label, batch_size, device,
+    progress_desc="Evaluating",
+):
     model.eval()
     model_examples = model_only_examples(examples)
     loader = DataLoader(model_examples, batch_size=batch_size, shuffle=False, collate_fn=collator)
@@ -217,7 +221,7 @@ def evaluate_model(model, examples, records, reports, collator, id2label, batch_
     total_tokens = 0
     offset = 0
     row_predictions = []
-    for batch in loader:
+    for batch in tqdm(loader, desc=progress_desc, unit="batch"):
         batch = {name: tensor.to(device) for name, tensor in batch.items()}
         outputs = model(**batch)
         labels = batch["labels"]

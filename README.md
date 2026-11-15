@@ -70,6 +70,14 @@ python train.py --config configs/partial.json
 python train.py --config configs/full.json
 ```
 
+The head-only configuration is set up for an initial representative trial:
+it samples 5% of training documents and 10% of validation documents using a
+deterministic language/entity-aware sampler, and runs for 3 epochs. The sampler
+preserves proportional language coverage and greedily ensures that every entity
+type present in the source split is represented when the sample is large enough.
+Set `sampling.enabled` to `false` and restore the desired epoch count for a full
+dataset run.
+
 From the Finaira project root, the equivalent command is:
 
 ```sh

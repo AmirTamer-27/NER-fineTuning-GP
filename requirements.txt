@@ -2,3 +2,4 @@ torch>=2.2
 transformers>=4.45,<5
 sentencepiece>=0.2
 mlflow>=2.20
+tqdm>=4.66

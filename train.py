@@ -14,9 +14,11 @@ from uuid import uuid4
 import torch
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
+from tqdm.auto import tqdm
 
 from evaluation import evaluate_model, model_only_examples
 from prepare_data import prepare_ner_dataset
+from sampling import stratified_sample
 
 
 def write_json(path, value):
@@ -68,7 +70,10 @@ def make_optimizer(model, config):
     return AdamW(groups, weight_decay=config.get("weight_decay", 0.01))
 
 
-def run_epoch(model, dataloader, device, optimizer=None, max_grad_norm=1.0):
+def run_epoch(
+    model, dataloader, device, optimizer=None, max_grad_norm=1.0,
+    progress_desc="Training",
+):
     training = optimizer is not None
     model.train(training)
     # Frozen features stay deterministic: training mode alone enables dropout.
@@ -82,7 +87,7 @@ def run_epoch(model, dataloader, device, optimizer=None, max_grad_norm=1.0):
     total_loss = 0.0
     total_labelled_tokens = 0
     total_correct = 0
-    for batch in dataloader:
+    for batch in tqdm(dataloader, desc=progress_desc, unit="batch"):
         batch = {name: tensor.to(device) for name, tensor in batch.items()}
         supervised = batch["labels"] != -100
         labelled_tokens = supervised.sum().item()
@@ -192,6 +197,21 @@ def train(config_path):
     if {r["text"] for r in records["train"]}.intersection(r["text"] for r in records["validation"]):
         raise ValueError("Training and validation contain identical document text.")
 
+    sampling = config.get("sampling", {})
+    if sampling.get("enabled", False):
+        sample_seed = sampling.get("seed", settings["seed"])
+        records["train"] = stratified_sample(
+            records["train"], sampling.get("train_fraction", 1.0), sample_seed
+        )
+        records["validation"] = stratified_sample(
+            records["validation"], sampling.get("validation_fraction", 1.0), sample_seed + 1
+        )
+        print(
+            "Using stratified document sample: "
+            f"train={len(records['train']):,}, "
+            f"validation={len(records['validation']):,}"
+        )
+
     cache_dir = config["model"].get("cache_dir")
     if cache_dir:
         cache_dir = str((base / cache_dir).resolve())
@@ -207,6 +227,7 @@ def train(config_path):
             max_length=config["data"]["max_length"],
             stride=config["data"]["stride"],
             include_metadata=True,
+            progress_desc=f"Tokenizing {split}",
         )
         if not prepared_examples[split]:
             raise ValueError(f"No prepared examples for {split}.")
@@ -260,16 +281,22 @@ def train(config_path):
     )
     best_score = -math.inf if maximize_selection else math.inf
     for epoch in range(1, settings["epochs"] + 1):
-        train_metrics = run_epoch(model, train_loader, device, optimizer, settings.get("max_grad_norm", 1.0))
+        train_metrics = run_epoch(
+            model, train_loader, device, optimizer,
+            settings.get("max_grad_norm", 1.0),
+            progress_desc=f"Epoch {epoch}/{settings['epochs']} - train",
+        )
         train_evaluation = evaluate_model(
             model, prepared_examples["train"], records["train"], reports["train"],
             collator, {value: key for key, value in label2id.items()},
             config.get("evaluation", {}).get("batch_size", settings["batch_size"]), device,
+            progress_desc=f"Epoch {epoch}/{settings['epochs']} - train eval",
         )
         validation_evaluation = evaluate_model(
             model, prepared_examples["validation"], records["validation"], reports["validation"],
             collator, {value: key for key, value in label2id.items()},
             config.get("evaluation", {}).get("batch_size", settings["batch_size"]), device,
+            progress_desc=f"Epoch {epoch}/{settings['epochs']} - validation",
         )
         row = {"epoch": epoch}
         row.update({f"train_{k}": v for k, v in train_metrics.items()})
@@ -290,9 +317,12 @@ def train(config_path):
         score = row[selection_metric]
         is_better = score > best_score if maximize_selection else score < best_score
         print(
-            f"Epoch {epoch}: train_loss={train_metrics['loss']:.4f}, "
+            f"Epoch {epoch}: "
+            f"train_loss={train_metrics['loss']:.4f}, "
+            f"train_accuracy={train_metrics['token_accuracy']:.2%}, "
             f"validation_loss={validation_evaluation['loss']:.4f}, "
-            f"validation_entity_f1={validation_evaluation['entity']['strict']['f1']:.4f}"
+            f"validation_accuracy={validation_evaluation['token_accuracy']:.2%}, "
+            f"validation_recall={validation_evaluation['entity']['strict']['recall']:.2%}"
         )
         if is_better:
             best_score = score

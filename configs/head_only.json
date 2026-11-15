@@ -46,13 +46,19 @@
     "encoder_learning_rate": 2e-05,
     "head_learning_rate": 2e-05,
     "batch_size": 28,
-    "epochs": 20,
+    "epochs": 3,
     "seed": 42,
     "device": "auto",
     "weight_decay": 0.01,
     "max_grad_norm": 1.0,
     "output_dir": "../runs",
     "optimizer": "AdamW"
+  },
+  "sampling": {
+    "enabled": true,
+    "train_fraction": 0.05,
+    "validation_fraction": 0.10,
+    "seed": 42
   },
   "mlflow": {
     "enabled": true,
