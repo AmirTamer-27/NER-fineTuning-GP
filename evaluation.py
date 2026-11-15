@@ -69,6 +69,32 @@ def token_metrics(confusion, id2label):
     }
 
 
+def token_label_counts(confusion, id2label):
+    """Count gold/predicted tags only where the gold token is supervised."""
+    return {
+        id2label[label_id]: {
+            "gold": sum(count for (gold, _), count in confusion.items() if gold == label_id),
+            "predicted": sum(count for (_, predicted), count in confusion.items() if predicted == label_id),
+        }
+        for label_id in sorted(id2label)
+    }
+
+
+def invalid_i_transitions(predicted_ids, gold_ids, id2label):
+    """Count I-tags that don't follow a B/I-tag of the same type in a chunk."""
+    invalid = 0
+    previous = "O"
+    for predicted_id, gold_id in zip(predicted_ids, gold_ids):
+        if gold_id == -100:
+            previous = "O"
+            continue
+        tag = id2label[int(predicted_id)]
+        if tag.startswith("I-") and previous not in ("B-" + tag[2:], tag):
+            invalid += 1
+        previous = tag
+    return invalid
+
+
 def _decode_chunk(predicted_ids, example, id2label, text):
     spans = []
     current = None
@@ -219,7 +245,7 @@ def evaluate_model(
     predictions_by_document = defaultdict(set)
     total_loss = 0.0
     total_tokens = 0
-    offset = 0
+    invalid_i_count = 0
     row_predictions = []
     for batch in tqdm(loader, desc=progress_desc, unit="batch"):
         batch = {name: tensor.to(device) for name, tensor in batch.items()}
@@ -233,10 +259,10 @@ def evaluate_model(
         row_predictions.extend(predicted_ids)
         label_rows = labels.cpu().tolist()
         for predicted_row, gold_row in zip(predicted_ids, label_rows):
+            invalid_i_count += invalid_i_transitions(predicted_row, gold_row, id2label)
             for predicted, gold in zip(predicted_row, gold_row):
                 if gold != -100:
                     confusion[(int(gold), int(predicted))] += 1
-        offset += len(predicted_ids)
 
     # Decode using the original document text. Raw text is kept outside model
     # tensors and is used only for character offsets and punctuation cleanup.
@@ -254,5 +280,7 @@ def evaluate_model(
         "token_micro_f1": token["micro"]["f1"],
         "token_macro_f1": token["macro"]["f1"],
         "token_per_label": token["per_label"],
+        "token_label_counts": token_label_counts(confusion, id2label),
+        "invalid_i_transitions": invalid_i_count,
         "entity": entities,
     }

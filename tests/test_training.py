@@ -15,6 +15,8 @@ from torch import nn
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 import train
+from evaluation import invalid_i_transitions, token_label_counts
+from collections import Counter
 
 
 class TinyModel(nn.Module):
@@ -44,6 +46,18 @@ class TrainingTests(unittest.TestCase):
         torch.manual_seed(42)
         self.model = TinyModel()
         self.batches = [batch([1, 2], [0, -100]), batch([2, 3, 4], [1, 2, 0])]
+
+    def test_token_diagnostics_exclude_masked_positions_and_detect_orphan_i(self):
+        labels = {0: "O", 1: "B-PERSON", 2: "I-PERSON", 3: "B-BANK", 4: "I-BANK"}
+        confusion = Counter({(0, 0): 2, (1, 2): 1, (2, 2): 1, (0, 3): 1})
+        counts = token_label_counts(confusion, labels)
+        self.assertEqual(counts["O"], {"gold": 3, "predicted": 2})
+        self.assertEqual(counts["I-PERSON"], {"gold": 1, "predicted": 2})
+        self.assertEqual(counts["B-BANK"], {"gold": 0, "predicted": 1})
+        self.assertEqual(
+            invalid_i_transitions([2, 1, 2, 2, 2, 4], [0, 1, 2, -100, 0, 0], labels),
+            3,
+        )
 
     def test_validation_weighted_loss_and_no_weight_updates(self):
         before = [p.detach().clone() for p in self.model.parameters()]

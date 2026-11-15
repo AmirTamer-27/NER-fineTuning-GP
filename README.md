@@ -95,6 +95,12 @@ Each epoch saves training loss and token accuracy from the training batches,
 plus validation loss, token accuracy, token-level F1, strict entity precision/recall/F1, relaxed-overlap entity
 precision/recall/F1, per-entity-type scores, boundary-error counts, masked
 ambiguous-entity counts, and supervised-token counts in `history.json`. The
+validation results also record gold and predicted counts for every BIO tag
+(including O) and invalid I-tag transitions. These are counted over supervised
+chunk tokens, so stride overlaps can be counted more than once; padding and
+masked positions are excluded. The full per-epoch diagnostic counts are in
+`evaluation_epoch_<n>.json` and are also logged as scalar MLflow metrics.
+The
 default best-checkpoint metric is `validation_entity_strict_f1`. The model and
 tokenizer are saved under `best_model/`. The run also saves its config, label
 mapping, dataset hashes, aggregate coverage, and parameter counts.

@@ -39,13 +39,13 @@
       "TIME",
       "TRANSACTION_REFERENCE"
     ],
-    "max_length": 128,
+    "max_length": 256,
     "stride": 32
   },
   "training": {
     "encoder_learning_rate": 2e-05,
-    "head_learning_rate": 2e-05,
-    "batch_size": 28,
+    "head_learning_rate": 0.001,
+    "batch_size": 32,
     "epochs": 3,
     "seed": 42,
     "device": "auto",
@@ -67,7 +67,7 @@
     "upload_checkpoint": false
   },
   "evaluation": {
-    "batch_size": 28,
+    "batch_size": 32,
     "selection_metric": "validation_entity_strict_f1"
   }
 }

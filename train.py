@@ -151,6 +151,7 @@ def flatten_evaluation(prefix, result):
         f"{prefix}_token_accuracy": result["token_accuracy"],
         f"{prefix}_token_micro_f1": result["token_micro_f1"],
         f"{prefix}_token_macro_f1": result["token_macro_f1"],
+        f"{prefix}_invalid_i_transitions": result["invalid_i_transitions"],
         f"{prefix}_entity_strict_precision": result["entity"]["strict"]["precision"],
         f"{prefix}_entity_strict_recall": result["entity"]["strict"]["recall"],
         f"{prefix}_entity_strict_f1": result["entity"]["strict"]["f1"],
@@ -168,6 +169,10 @@ def flatten_evaluation(prefix, result):
         flattened[f"{prefix}_{safe_label}_precision"] = metrics["precision"]
         flattened[f"{prefix}_{safe_label}_recall"] = metrics["recall"]
         flattened[f"{prefix}_{safe_label}_f1"] = metrics["f1"]
+    for label, counts in result["token_label_counts"].items():
+        safe_label = label.lower().replace("-", "_")
+        flattened[f"{prefix}_token_{safe_label}_gold"] = counts["gold"]
+        flattened[f"{prefix}_token_{safe_label}_predicted"] = counts["predicted"]
     return flattened
 
 
