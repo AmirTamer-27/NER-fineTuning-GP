@@ -382,7 +382,11 @@ def upload_to_mlflow(run_dir):
     best = json.loads((run_dir / "best_metrics.json").read_text())
     run_id_path = run_dir / "mlflow_run_id.txt"
     run_id = run_id_path.read_text().strip() if run_id_path.exists() else None
-    with mlflow.start_run(run_id=run_id, run_name=run_dir.name) as run:
+    run_name = (
+        f"{tracking['run_name']}_{run_dir.name}"
+        if tracking.get("run_name") else run_dir.name
+    )
+    with mlflow.start_run(run_id=run_id, run_name=run_name) as run:
         run_id_path.write_text(run.info.run_id + "\n")
         params = {f"model.{k}": v for k, v in config["model"].items()}
         params.update({f"training.{k}": v for k, v in config["training"].items()})

@@ -11,14 +11,14 @@
     "train_path": "../finaira_bilingual_ner_v2/train.jsonl",
     "validation_path": "../finaira_bilingual_ner_v2/validation.jsonl",
     "entity_types": ["AGE", "APPLICATION_REFERENCE", "BANK", "BANK_ACCOUNT_NUMBER", "BRANCH", "CITY", "CORPORATION", "COUNTRY", "CURRENCY", "CUSTOMER_ID", "DATE", "DETAILED_ADDRESS", "DISPUTE_ID", "EMAIL_ADDRESS", "GOVERNMENT_ENTITY", "IBAN", "JOB_TITLE", "MONETARY_AMOUNT", "NATIONALITY", "NATIONAL_ID_NUMBER", "PARTIAL_CARD_NUMBER", "PASSPORT_NUMBER", "PAYMENT_CARD_NUMBER", "PERSON_NAME", "PHONE_NUMBER", "QUANTITY", "SERVICE_REQUEST_ID", "TIME", "TRANSACTION_REFERENCE"],
-    "max_length": 512,
-    "stride": 64
+    "max_length": 256,
+    "stride": 32
   },
   "training": {
     "encoder_learning_rate": 2e-05,
-    "head_learning_rate": 2e-05,
-    "batch_size": 28,
-    "epochs": 20,
+    "head_learning_rate": 0.001,
+    "batch_size": 32,
+    "epochs": 15,
     "seed": 42,
     "device": "auto",
     "weight_decay": 0.01,
@@ -26,14 +26,23 @@
     "output_dir": "../runs",
     "optimizer": "AdamW"
   },
+  "sampling": {
+    "enabled": true,
+    "train_fraction": 0.20,
+    "validation_fraction": 0.10,
+    "seed": 42
+  },
   "mlflow": {
     "enabled": true,
     "tracking_uri": "https://dagshub.com/AmirTamer-27/NER-FineTuning-GP.mlflow",
     "experiment_name": "Finaira-Bilingual-NER",
+    "run_name": "XLMR-Partial-Last4-Train20-Val10",
     "upload_checkpoint": false
   },
   "evaluation": {
-    "batch_size": 28,
-    "selection_metric": "validation_entity_strict_f1"
+    "batch_size": 32,
+    "selection_metric": "validation_entity_strict_f1",
+    "early_stopping_patience": 3,
+    "early_stopping_min_delta": 0.001
   }
 }
