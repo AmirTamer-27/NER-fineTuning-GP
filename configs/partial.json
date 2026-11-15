@@ -37,7 +37,7 @@
     "tracking_uri": "https://dagshub.com/AmirTamer-27/NER-FineTuning-GP.mlflow",
     "experiment_name": "Finaira-Bilingual-NER",
     "run_name": "XLMR-Partial-Last4-Train20-Val10",
-    "upload_checkpoint": false
+    "upload_checkpoint": true
   },
   "evaluation": {
     "batch_size": 32,

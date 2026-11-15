@@ -64,7 +64,7 @@
     "enabled": true,
     "tracking_uri": "https://dagshub.com/AmirTamer-27/NER-FineTuning-GP.mlflow",
     "experiment_name": "Finaira-Bilingual-NER-Head-Only-Trial",
-    "upload_checkpoint": false
+    "upload_checkpoint": true
   },
   "evaluation": {
     "batch_size": 32,

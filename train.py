@@ -1,4 +1,4 @@
-"""Config-driven PyTorch NER training with a final DagsHub MLflow upload."""
+"""Config-driven PyTorch NER training with DagsHub checkpoint backups."""
 
 import argparse
 import hashlib
@@ -19,6 +19,7 @@ from tqdm.auto import tqdm
 from evaluation import evaluate_model, model_only_examples
 from prepare_data import prepare_ner_dataset
 from sampling import stratified_sample
+from checkpointing import upload_best_checkpoint
 
 
 def write_json(path, value):
@@ -343,6 +344,9 @@ def train(config_path):
             tokenizer.save_pretrained(run_dir / "best_model")
             write_json(run_dir / "best_metrics.json", row)
             write_json(run_dir / "best_evaluation.json", evaluation_row)
+            if config.get("mlflow", {}).get("enabled", False) and config["mlflow"].get("upload_checkpoint", False):
+                # Back up while training; a Kaggle reset must not erase all epochs.
+                upload_to_mlflow(run_dir, checkpoint_only=True)
         significant_improvement = (
             score > stopping_score + min_delta if maximize_selection
             else score < stopping_score - min_delta
@@ -365,7 +369,7 @@ def train(config_path):
 
 
 # Final step: upload training/validation results to DagsHub's MLflow experiment.
-def upload_to_mlflow(run_dir):
+def upload_to_mlflow(run_dir, checkpoint_only=False):
     config = json.loads((run_dir / "config.json").read_text())
     tracking = config["mlflow"]
     if not tracking.get("enabled", False):
@@ -396,7 +400,7 @@ def upload_to_mlflow(run_dir):
         for split, info in summary["data"].items():
             params.update({f"{split}.{k}": v for k, v in info.items()})
         mlflow.log_params(params)
-        for row in history:
+        for row in (history[-1:] if checkpoint_only else history):
             mlflow.log_metrics({k: v for k, v in row.items() if k != "epoch"}, step=row["epoch"])
         mlflow.log_metrics({"best_epoch": best["epoch"], "best_validation_loss": best["validation_loss"]})
         for name in (
@@ -407,7 +411,7 @@ def upload_to_mlflow(run_dir):
             if artifact.exists():
                 mlflow.log_artifact(str(artifact), artifact_path="results")
         if tracking.get("upload_checkpoint", False):
-            mlflow.log_artifacts(str(run_dir / "best_model"), artifact_path="best_model")
+            upload_best_checkpoint(run_dir, mlflow, best)
         print(f"Uploaded results to MLflow run {run.info.run_id}")
 
 

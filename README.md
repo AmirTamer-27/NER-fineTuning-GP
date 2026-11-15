@@ -167,3 +167,26 @@ The tests use a tiny PyTorch network and synthetic batches; they do not download
 XLM-R, train on the real dataset, or contact DagsHub.
 
 Official tracking setup: https://dagshub.com/docs/integration_guide/mlflow_tracking/
+
+### Checkpoint backups on Kaggle
+
+All experiment configs enable `mlflow.upload_checkpoint`. Every new best
+validation checkpoint uploads immediately to the same DagsHub MLflow run,
+without waiting for training to finish. Each backup has its own directory:
+
+```text
+checkpoints/epoch_0001/best_model/
+checkpoints/epoch_0002/best_model/
+results/latest_checkpoint.json
+```
+
+`latest_checkpoint.json` points to the latest completed backup. Download the
+entire referenced `best_model` folder for inference, including weights,
+configuration and tokenizer. The run config and best-epoch metrics are stored
+beside that folder. Older completed backups remain available if a later upload
+is interrupted. The final metrics upload skips weights already backed up.
+
+Uploads are synchronous: wait for `Checkpoint backed up: ...` before assuming
+a checkpoint is remote. An upload failure raises an error rather than silently
+continuing without a backup. These are model/tokenizer checkpoints for inference;
+they do not include optimizer state for exact training resumption.
