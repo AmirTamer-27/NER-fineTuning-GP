@@ -1,4 +1,4 @@
-"""Config-driven PyTorch NER training with DagsHub checkpoint backups."""
+"""Config-driven PyTorch NER training with a final best-checkpoint upload."""
 
 import argparse
 import hashlib
@@ -344,9 +344,6 @@ def train(config_path):
             tokenizer.save_pretrained(run_dir / "best_model")
             write_json(run_dir / "best_metrics.json", row)
             write_json(run_dir / "best_evaluation.json", evaluation_row)
-            if config.get("mlflow", {}).get("enabled", False) and config["mlflow"].get("upload_checkpoint", False):
-                # Back up while training; a Kaggle reset must not erase all epochs.
-                upload_to_mlflow(run_dir, checkpoint_only=True)
         significant_improvement = (
             score > stopping_score + min_delta if maximize_selection
             else score < stopping_score - min_delta
@@ -369,7 +366,7 @@ def train(config_path):
 
 
 # Final step: upload training/validation results to DagsHub's MLflow experiment.
-def upload_to_mlflow(run_dir, checkpoint_only=False):
+def upload_to_mlflow(run_dir):
     config = json.loads((run_dir / "config.json").read_text())
     tracking = config["mlflow"]
     if not tracking.get("enabled", False):
@@ -400,7 +397,7 @@ def upload_to_mlflow(run_dir, checkpoint_only=False):
         for split, info in summary["data"].items():
             params.update({f"{split}.{k}": v for k, v in info.items()})
         mlflow.log_params(params)
-        for row in (history[-1:] if checkpoint_only else history):
+        for row in history:
             mlflow.log_metrics({k: v for k, v in row.items() if k != "epoch"}, step=row["epoch"])
         mlflow.log_metrics({"best_epoch": best["epoch"], "best_validation_loss": best["validation_loss"]})
         for name in (

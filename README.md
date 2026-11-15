@@ -170,22 +170,24 @@ Official tracking setup: https://dagshub.com/docs/integration_guide/mlflow_track
 
 ### Checkpoint backups on Kaggle
 
-All experiment configs enable `mlflow.upload_checkpoint`. Every new best
-validation checkpoint uploads immediately to the same DagsHub MLflow run,
-without waiting for training to finish. Each backup has its own directory:
+All experiment configs enable `mlflow.upload_checkpoint`. During training,
+the run keeps only `best_model/` locally, updating the same folder when validation
+improves. Other epochs are not saved as model checkpoints. At normal completion
+or early stopping, the best checkpoint uploads once to the DagsHub MLflow run:
 
 ```text
-checkpoints/epoch_0001/best_model/
-checkpoints/epoch_0002/best_model/
+checkpoints/epoch_<best_epoch>/best_model/
 results/latest_checkpoint.json
 ```
 
 `latest_checkpoint.json` points to the latest completed backup. Download the
 entire referenced `best_model` folder for inference, including weights,
 configuration and tokenizer. The run config and best-epoch metrics are stored
-beside that folder. Older completed backups remain available if a later upload
-is interrupted. The final metrics upload skips weights already backed up.
+beside that folder. Retrying the final upload skips weights already backed up.
+The local best-model folder is retained for download. Existing remote artifacts
+from older runs are not deleted by this change.
 
+An interrupted Kaggle session before the final upload can lose the local model.
 Uploads are synchronous: wait for `Checkpoint backed up: ...` before assuming
 a checkpoint is remote. An upload failure raises an error rather than silently
 continuing without a backup. These are model/tokenizer checkpoints for inference;
