@@ -39,8 +39,8 @@
       "TIME",
       "TRANSACTION_REFERENCE"
     ],
-    "max_length": 512,
-    "stride": 64
+    "max_length": 128,
+    "stride": 32
   },
   "training": {
     "encoder_learning_rate": 2e-05,
