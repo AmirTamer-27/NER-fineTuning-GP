@@ -1,6 +1,7 @@
 """Prepare unpadded BIO training examples from annotated document records."""
 
 from alignment_policy import classify_boundary_conflict
+from tokenization import tokenize_document, validate_tokenization_settings
 from tqdm.auto import tqdm
 
 
@@ -20,13 +21,7 @@ def prepare_ner_dataset(
     documents and completeness metadata are not modified. Overlap positions
     can receive supervision in multiple chunks; no deduplication is applied.
     """
-    if not tokenizer.is_fast:
-        raise ValueError("A fast tokenizer is required for character offsets.")
-    if not 2 < max_length <= tokenizer.model_max_length:
-        raise ValueError("Invalid maximum sequence length.")
-    capacity = max_length - tokenizer.num_special_tokens_to_add(pair=False)
-    if not 0 <= stride < capacity:
-        raise ValueError("stride must be smaller than the text-token capacity.")
+    validate_tokenization_settings(tokenizer, max_length, stride)
 
     entity_types = list(entity_types)
     if not entity_types or len(entity_types) != len(set(entity_types)):
@@ -65,15 +60,11 @@ def prepare_ner_dataset(
             if any(overlaps(span["start"], span["end"], s) for s in ignored)
         }
         supervised_entities = set()
-        chunks = tokenizer(
+        chunks = tokenize_document(
             text,
+            tokenizer,
             max_length=max_length,
-            truncation=True,
             stride=stride,
-            return_overflowing_tokens=True,
-            return_offsets_mapping=True,
-            return_special_tokens_mask=True,
-            padding=False,
         )
 
         punctuation_conflicts = {}
